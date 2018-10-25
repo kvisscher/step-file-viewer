@@ -18,6 +18,11 @@ type Value struct {
 	Text        string `xml:",innerxml"`
 }
 
+type ValueGroup struct {
+	AttributeID string  `xml:"AttributeID,attr"`
+	Values      []Value `xml:"Value"`
+}
+
 type ProductCrossReference struct {
 	ID     string  `xml:"ProductID,attr"`
 	Type   string  `xml:"Type,attr"`
@@ -29,6 +34,7 @@ type Product struct {
 	ParentID       string
 	Name           string
 	Values         []Value                 `xml:"Values>Value"`
+	ValueGroup     []ValueGroup            `xml:"Values>ValueGroup"`
 	CrossReference []ProductCrossReference `xml:"ProductCrossReference"`
 	Children       []Product               `xml:"Product"`
 }
@@ -53,7 +59,7 @@ func main() {
 	cachedFile := path.Join(dir, path.Base(f))
 	if _, err := os.Stat(cachedFile); !os.IsNotExist(err) {
 		// Don't have to parse XML
-		log.Println("reading cached file..")
+		log.Printf("reading cached file %s", cachedFile)
 
 		if b, err := ioutil.ReadFile(cachedFile); err == nil {
 			if err = json.Unmarshal(b, &products); err != nil {
@@ -75,11 +81,13 @@ func main() {
 		log.Println("saved cache")
 	}
 
-	log.Printf("going to search for a product that matches %s = %s", searchField, searchValue)
+	log.Printf("going to search for products that matches %s = %s", searchField, searchValue)
 
 	var matchedProducts []Product
 	for _, p := range products {
 		if searchInValues(searchField, searchValue, &p) {
+			log.Printf("found a match %s %s", p.ID, p.Name)
+
 			matchedProducts = append(matchedProducts, p)
 		}
 	}
@@ -179,6 +187,16 @@ func searchInValues(property, value string, product *Product) bool {
 	for _, v := range product.Values {
 		if strings.EqualFold(v.AttributeID, property) && v.Text == value {
 			return true
+		}
+	}
+
+	for _, g := range product.ValueGroup {
+		if strings.EqualFold(g.AttributeID, property) {
+			for _, v := range g.Values {
+				if v.Text == value {
+					return true
+				}
+			}
 		}
 	}
 
